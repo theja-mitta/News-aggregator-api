@@ -8,65 +8,70 @@ const writePath = path.join(__dirname, '..', '/data/users.json');
 
 const apiKey = process.env.NEWS_API_KEY;
 
+// Fetch news sources from the News API
 async function fetchNewsSources() {
-    try {
-        const response = await axios.get(`${process.env.NEWS_API_BASE_URL}/v2/sources`, {
-            params: {
-                apiKey
-            }
-        });
+  try {
+    const response = await axios.get(`${process.env.NEWS_API_BASE_URL}/v2/sources`, {
+      params: {
+        apiKey,
+      },
+    });
 
-        return response.data.sources;
-    } catch (error) {
-        throw new Error('Failed to fetch news sources');
-    }
+    return response.data.sources;
+  } catch (error) {
+    throw new Error('Failed to fetch news sources');
+  }
 }
 
+// Fetch news articles from the News API using specified sources
 async function fetchNewsArticles(newsSources) {
-    try {
-        const sourceIds = newsSources.map(source => source.id);
+  try {
+    const sourceIds = newsSources.map(source => source.id);
 
-        const requests = sourceIds.map(sourceId => {
-            return axios.get(`${process.env.NEWS_API_BASE_URL}/v2/top-headlines`, {
-                params: {
-                    sources: sourceId,
-                    apiKey
-                }
-            });
+    const requests = sourceIds.map(sourceId => {
+      return axios.get(`${process.env.NEWS_API_BASE_URL}/v2/top-headlines`, {
+        params: {
+          sources: sourceId,
+          apiKey,
+        },
+      });
+    });
+
+    const responses = await Promise.all(requests);
+
+    // Flatten the articles from all responses into a single array
+    const articles = responses
+      .map(response => {
+        const articlesFromResponse = response.data.articles;
+        // Add a unique ID to each article
+        return articlesFromResponse.map(article => {
+          return { id: `${article.source.name}-${article.title}`, ...article };
         });
+      })
+      .flat();
 
-        const responses = await Promise.all(requests);
-
-        /** The flat() method flattens the array by one level by default, removing the nesting and 
-        * creating a single array that contains all the articles from all the responses. */ 
-        const articles = responses.map(response => {
-            const articlesFromResponse = response.data.articles;
-            // Add a unique ID to each article
-            return articlesFromResponse.map(article => {
-                return { id:`${article.source.name}-${article.title}`, ...article };
-            });
-        }).flat();
-
-        return articles;
-    } catch (error) {
-        throw new Error('Failed to fetch news articles');
-    }
+    return articles;
+  } catch (error) {
+    throw new Error('Failed to fetch news articles');
+  }
 }
 
+// Fetch news articles from the News API using a keyword
 async function fetchNewsArticlesByKeyword(keyword) {
-    try {
-        const response = await axios.get(`${process.env.NEWS_API_BASE_URL}/v2/top-headlines?q=${keyword}`, {
-            params: {
-                apiKey
-            }
-        });
+  try {
+    const response = await axios.get(`${process.env.NEWS_API_BASE_URL}/v2/top-headlines?q=${keyword}`, {
+      params: {
+        apiKey,
+      },
+    });
 
-        return response.data.articles;
-    } catch (error) {
-        throw new Error(`Failed to fetch news articles with the keyword ${keyword}`);
-    }
+    return response.data.articles;
+  } catch (error) {
+    throw new Error(`Failed to fetch news articles with the keyword ${keyword}`);
+  }
 }
 
+// Mark an article as read for a user
 const markArticleAsRead = (articleId, userId, cachedArticles) => {
   if (!cachedArticles) {
     throw new Error('Articles data not found in cache');
@@ -94,6 +99,7 @@ const markArticleAsRead = (articleId, userId, cachedArticles) => {
   writeDataToPath(userData, writePath);
 };
 
+// Mark an article as favorite for a user
 const markArticleAsFavorite = (articleId, userId, cachedArticles) => {
   if (!cachedArticles) {
     throw new Error('Articles data not found in cache');
@@ -121,49 +127,51 @@ const markArticleAsFavorite = (articleId, userId, cachedArticles) => {
   writeDataToPath(userData, writePath);
 };
 
-
+// Fetch read articles for a user
 const fetchReadArticlesForUser = (userId, cachedArticles) => {
-  try {  
-      const readArticleIds = getUserData().users.find(user => user.id === userId).readArticles;
-      const readArticlesForUser = [];
+  try {
+    const readArticleIds = getUserData().users.find(user => user.id === userId).readArticles;
+    const readArticlesForUser = [];
 
-      if (!cachedArticles) {
-          throw new Error('Articles data not found in cache');
+    if (!cachedArticles) {
+      throw new Error('Articles data not found in cache');
+    }
+
+    cachedArticles.forEach(article => {
+      if (readArticleIds.includes(article.id)) {
+        readArticlesForUser.push(article);
       }
+    });
 
-      cachedArticles.forEach(article => {
-          if (readArticleIds.includes(article.id)) {
-              readArticlesForUser.push(article);
-          }
-      });
-
-      return readArticlesForUser;
+    return readArticlesForUser;
   } catch (error) {
-      throw new Error('Failed to fetch read articles');
+    throw new Error('Failed to fetch read articles');
   }
-} 
+};
 
+// Fetch favorite articles for a user
 const fetchFavoriteArticlesForUser = (userId, cachedArticles) => {
-  try {  
-      const favoriteArticleIds = getUserData().users.find(user => user.id === userId).favoriteArticles;
-      const favoriteArticlesForUser = [];
+  try {
+    const favoriteArticleIds = getUserData().users.find(user => user.id === userId).favoriteArticles;
+    const favoriteArticlesForUser = [];
 
-      if (!cachedArticles) {
-          throw new Error('Articles data not found in cache');
+    if (!cachedArticles) {
+      throw new Error('Articles data not found in cache');
+    }
+
+    cachedArticles.forEach(article => {
+      if (favoriteArticleIds.includes(article.id)) {
+        favoriteArticlesForUser.push(article);
       }
+    });
 
-      cachedArticles.forEach(article => {
-          if (favoriteArticleIds.includes(article.id)) {
-            favoriteArticlesForUser.push(article);
-          }
-      });
-
-      return favoriteArticlesForUser;
+    return favoriteArticlesForUser;
   } catch (error) {
-      throw new Error('Failed to fetch favorite articles');
+    throw new Error('Failed to fetch favorite articles');
   }
-}
+};
 
+// Filter article sources by user preferences
 const filterSourcesByUserPreferences = (articleSources, userPreferences) => {
   const { countries, sources: preferredSources, languages } = userPreferences;
   const filteredSources = articleSources.filter(articleSource => {
@@ -192,15 +200,15 @@ const filterSourcesByUserPreferences = (articleSources, userPreferences) => {
   });
 
   return filteredSources;
-}
+};
 
 module.exports = {
-    fetchNewsSources,
-    fetchNewsArticles,
-    fetchNewsArticlesByKeyword,
-    markArticleAsRead,
-    markArticleAsFavorite,
-    fetchReadArticlesForUser,
-    fetchFavoriteArticlesForUser,
-    filterSourcesByUserPreferences
-}
+  fetchNewsSources,
+  fetchNewsArticles,
+  fetchNewsArticlesByKeyword,
+  markArticleAsRead,
+  markArticleAsFavorite,
+  fetchReadArticlesForUser,
+  fetchFavoriteArticlesForUser,
+  filterSourcesByUserPreferences,
+};
