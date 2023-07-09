@@ -1,10 +1,10 @@
 const axios = require('axios');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
 const { getUserData } = require('../services/userService');
-const userData = require('../data/users.json');
 const { writeDataToPath } = require('../helpers/dataWriter');
-const writePath = path.join(__dirname, '..', '/data/users.json');
+const writePath = process.env.NODE_ENV === 'test'
+  ? path.join(__dirname, '..', '/test/data/users.test.json')
+  : path.join(__dirname, '..', '/data/users.json');
 
 const apiKey = process.env.NEWS_API_KEY;
 
@@ -84,13 +84,15 @@ const markArticleAsRead = (articleId, userId, cachedArticles) => {
     throw new Error('Article not found');
   }
 
-  const userObj = userData.users.find(user => user.id === userId);
+  const userObj = getUserData().users.find(user => user.id === userId);
 
   if (!userObj) {
     throw new Error('User not found');
   }
 
-  if (!userObj.readArticles.includes(articleId)) {
+  if (!userObj.readArticles) {
+    userObj.readArticles = [articleId];
+  } else if (!userObj.readArticles.includes(articleId)) {
     userObj.readArticles.push(articleId);
   } else {
     throw new Error(`Article with id ${articleId} is already marked as read`);
@@ -112,17 +114,20 @@ const markArticleAsFavorite = (articleId, userId, cachedArticles) => {
     throw new Error('Article not found');
   }
 
-  const userObj = userData.users.find(user => user.id === userId);
+  const userObj = getUserData().users.find(user => user.id === userId);
 
   if (!userObj) {
     throw new Error('User not found');
   }
-
-  if (!userObj.favoriteArticles.includes(articleId)) {
+  
+  if (!userObj.favoriteArticles) {
+    userObj.favoriteArticles = [articleId];
+  } else if (!userObj.favoriteArticles.includes(articleId)) {
     userObj.favoriteArticles.push(articleId);
   } else {
     throw new Error(`Article with id ${articleId} is already marked as favorite`);
   }
+  
 
   writeDataToPath(userData, writePath);
 };
