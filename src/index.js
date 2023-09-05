@@ -10,5 +10,3 @@ app.listen(port, (error) => {
         console.log('Error has occured', error);
     }
 });
-
-
